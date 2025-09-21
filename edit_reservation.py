@@ -1,22 +1,9 @@
-# edit_reservation.py
 from tkinter import *
 from tkinter import messagebox
-import sqlite3, os
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_FILE = os.path.join(BASE_DIR, "ffly.db")
-
-def _fetch_booking(bid):
-    conn = sqlite3.connect(DB_FILE)
-    cur = conn.cursor()
-    cur.execute("""SELECT id, full_name, flight_no, departure, destination, date, seat_no
-                   FROM bookings WHERE id = ?""", (bid,))
-    row = cur.fetchone()
-    conn.close()
-    return row  # (id, full_name, flight_no, departure, destination, date, seat_no)
+from database import fetch_booking, update_booking
 
 def open_page(booking_id, on_back, master=None):
-    row = _fetch_booking(booking_id)
+    row = fetch_booking(booking_id)
     if not row:
         messagebox.showerror("Not found", f"Reservation ID {booking_id} not found.")
         on_back()
@@ -29,7 +16,6 @@ def open_page(booking_id, on_back, master=None):
     form = Frame(win)
     form.pack(pady=20)
 
-    # --- fields (prefilled) ---
     Label(form, text="Full Name:", font=("Arial", 14)).grid(row=0, column=0, padx=10, pady=10, sticky="e")
     name_entry = Entry(form, width=35, borderwidth=2, font=("Arial", 12))
     name_entry.grid(row=0, column=1, padx=10, pady=10)
@@ -54,7 +40,6 @@ def open_page(booking_id, on_back, master=None):
     seat_entry = Entry(form, width=35, borderwidth=2, font=("Arial", 12))
     seat_entry.grid(row=5, column=1, padx=10, pady=10)
 
-    # prefill
     _, full_name, flight_no, departure, destination, date, seat_no = row
     name_entry.insert(0, full_name)
     flight_entry.insert(0, flight_no)
@@ -77,25 +62,15 @@ def open_page(booking_id, on_back, master=None):
             messagebox.showerror("Missing Data", "Please fill all fields.")
             return
         try:
-            conn = sqlite3.connect(DB_FILE)
-            cur = conn.cursor()
-            cur.execute("""UPDATE bookings
-                           SET full_name=:full_name,
-                               flight_no=:flight_no,
-                               departure=:departure,
-                               destination=:destination,
-                               date=:date,
-                               seat_no=:seat_no
-                           WHERE id=:id""", data)
-            conn.commit()
-            conn.close()
+            update_booking(data)
             messagebox.showinfo("Saved", "Changes saved successfully.")
             win.destroy()
-            on_back()   # يرجّع لصفحة الـ reservations ويعمل refresh هناك
+            on_back()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save changes:\n{e}")
 
-    btns = Frame(win); btns.pack(pady=20)
+    btns = Frame(win)
+    btns.pack(pady=20)
     Button(btns, text="Save Changes", font=("Arial", 14), width=16, command=save_changes).grid(row=0, column=0, padx=10)
     Button(btns, text="Back", font=("Arial", 14), width=16,
            command=lambda: (win.destroy(), on_back())).grid(row=0, column=1, padx=10)

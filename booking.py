@@ -1,33 +1,9 @@
 from tkinter import *
 from tkinter import messagebox
-import sqlite3, os
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_FILE = os.path.join(BASE_DIR, "ffly.db")
-
-def _init_db():
-    """Create DB file & table if not exist."""
-    conn = sqlite3.connect(DB_FILE)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS bookings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            full_name TEXT NOT NULL,
-            flight_no TEXT NOT NULL,
-            departure TEXT NOT NULL,
-            destination TEXT NOT NULL,
-            date TEXT NOT NULL,
-            seat_no TEXT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    conn.commit()
-    conn.close()
+from database import init_db, insert_booking, DB_FILE
 
 def open_page(on_back):
-    _init_db()
+    init_db()
 
     bk = Tk()
     bk.title("Booking Page")
@@ -69,27 +45,12 @@ def open_page(on_back):
             "date": date_entry.get().strip(),
             "seat_no": seat_entry.get().strip(),
         }
-
-        # تحقق بسيط
         if any(v == "" for v in data.values()):
             messagebox.showerror("Missing Data", "Please fill all fields.")
             return
-
         try:
-            print("Saving to:", DB_FILE)  # Debug في الكونسول
-            conn = sqlite3.connect(DB_FILE)
-            cur = conn.cursor()
-            cur.execute(
-                """
-                INSERT INTO bookings (full_name, flight_no, departure, destination, date, seat_no)
-                VALUES (:full_name, :flight_no, :departure, :destination, :date, :seat_no)
-                """,
-                data,
-            )
-            conn.commit()
-            conn.close()
+            insert_booking(data)
             messagebox.showinfo("Saved", "Booking saved successfully.")
-            # امسح الحقول بعد الحفظ
             for e in (name_entry, flight_entry, dep_entry, des_entry, date_entry, seat_entry):
                 e.delete(0, END)
         except Exception as e:

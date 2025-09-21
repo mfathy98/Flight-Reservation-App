@@ -1,44 +1,16 @@
-# reservations.py
 from tkinter import *
 from tkinter import ttk, messagebox
-import sqlite3, os
-
-# نفس مسار قاعدة البيانات المستخدم في booking.py
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_FILE = os.path.join(BASE_DIR, "ffly.db")
-
-def _ensure_table():
-    # للتأكد إن الجدول موجود حتى لو فتحت الصفحة مباشرة
-    conn = sqlite3.connect(DB_FILE)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS bookings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            full_name TEXT NOT NULL,
-            flight_no TEXT NOT NULL,
-            departure TEXT NOT NULL,
-            destination TEXT NOT NULL,
-            date TEXT NOT NULL,
-            seat_no TEXT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    conn.commit()
-    conn.close()
+from database import init_db, fetch_all_bookings, delete_booking
 
 def open_page(on_back):
-    _ensure_table()
+    init_db()
 
     res = Tk()
     res.title("Reservations")
     res.geometry("900x600")
 
-    # ====== Title ======
     Label(res, text="Reservations List", font=("Arial", 20, "bold")).pack(pady=10)
 
-    # ====== Table Frame (for Treeview + Scrollbar) ======
     table_frame = Frame(res)
     table_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
@@ -53,7 +25,6 @@ def open_page(on_back):
     tree.heading("seat_no", text="Seat No")
     tree.heading("created_at", text="Created At")
 
-    # أعرض أعمدة مقروءة
     tree.column("id", width=60, anchor=CENTER)
     tree.column("full_name", width=160)
     tree.column("flight_no", width=100, anchor=CENTER)
@@ -71,23 +42,17 @@ def open_page(on_back):
     table_frame.rowconfigure(0, weight=1)
     table_frame.columnconfigure(0, weight=1)
 
-    # ====== Helpers ======
     def load_data():
         tree.delete(*tree.get_children())
-        conn = sqlite3.connect(DB_FILE)
-        cur = conn.cursor()
-        cur.execute("SELECT id, full_name, flight_no, departure, destination, date, seat_no, created_at "
-                    "FROM bookings ORDER BY created_at DESC, id DESC")
-        for row in cur.fetchall():
+        for row in fetch_all_bookings():
             tree.insert("", END, values=row)
-        conn.close()
 
     def get_selected_id():
         sel = tree.selection()
         if not sel:
             return None
         values = tree.item(sel[0], "values")
-        return values[0]  # id في أول عمود
+        return values[0]
 
     def on_delete():
         bid = get_selected_id()
@@ -97,11 +62,7 @@ def open_page(on_back):
         if not messagebox.askyesno("Confirm Delete", f"Delete reservation ID {bid}?"):
             return
         try:
-            conn = sqlite3.connect(DB_FILE)
-            cur = conn.cursor()
-            cur.execute("DELETE FROM bookings WHERE id = ?", (bid,))
-            conn.commit()
-            conn.close()
+            delete_booking(bid)
             load_data()
             messagebox.showinfo("Deleted", f"Reservation ID {bid} deleted.")
         except Exception as e:
@@ -112,28 +73,21 @@ def open_page(on_back):
         if not bid:
             messagebox.showwarning("Select row", "Please select a reservation to edit.")
             return
-        # GUI فقط: افتح صفحة تعديل من ملف خارجي edit_reservation.py
         try:
-            import edit_reservation  # لازم تعمل الملف ده
-            # أخفي صفحة الحجوزات مؤقتًا وافتح صفحة التعديل
+            import edit_reservation
             res.withdraw()
-            # نمرر on_back يرجعنا ويعمل Refresh
             edit_reservation.open_page(
                 booking_id=bid,
                 on_back=lambda: (res.deiconify(), load_data())
             )
         except ModuleNotFoundError:
-            messagebox.showinfo(
-                "Edit",
-                "Edit GUI placeholder.\nCreate 'edit_reservation.py' with open_page(booking_id, on_back)."
-            )
+            messagebox.showinfo("Edit", "Create 'edit_reservation.py' with open_page(booking_id, on_back).")
 
     def on_double_click(event):
         on_edit()
 
     tree.bind("<Double-1>", on_double_click)
 
-    # ====== Buttons ======
     btns = Frame(res)
     btns.pack(pady=10)
 
@@ -143,7 +97,5 @@ def open_page(on_back):
     Button(btns, text="Back to Home", font=("Arial", 12), width=12,
            command=lambda: (res.destroy(), on_back())).grid(row=0, column=3, padx=8)
 
-    # أول تحميل
     load_data()
-
     res.mainloop()
