@@ -1,0 +1,4 @@
+python libraries used 
+1)tkinter
+2)sqlite
+3)os
